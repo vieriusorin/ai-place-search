@@ -23,12 +23,20 @@ export function useMap() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isUserInteracting, setIsUserInteracting] = useState(false)
+  const [isClient, setIsClient] = useState(false)
 
   const mapRef = useRef<HTMLDivElement>(null)
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map())
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
 
-  // Debounce map movement to avoid excessive API calls
+  // Check if we're on the client side
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsClient(true)
+    }
+  }, [])
+
+  // Debounce map movement to avoid excessive API calls - only on client
   const debouncedCenter = useDebounce(viewState.center, 500)
   const debouncedZoom = useDebounce(viewState.zoom, 300)
 
@@ -37,6 +45,11 @@ export function useMap() {
    */
   const initializeMap = useCallback(async (container: HTMLDivElement) => {
     try {
+      // Check if we're in the browser environment
+      if (typeof window === 'undefined') {
+        throw new Error('Cannot initialize map on server side')
+      }
+      
       // Wait for Google Maps to load if not already loaded
       if (!window.google) {
         throw new Error('Google Maps not loaded')
@@ -385,10 +398,10 @@ export function useMap() {
 
   // Effect to handle map container changes
   useEffect(() => {
-    if (mapRef.current && !mapInstance) {
+    if (isClient && mapRef.current && !mapInstance) {
       initializeMap(mapRef.current)
     }
-  }, [mapRef.current, mapInstance, initializeMap])
+  }, [isClient, mapInstance, initializeMap])
 
   return {
     // Refs

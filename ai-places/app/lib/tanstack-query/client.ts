@@ -107,6 +107,23 @@ export const queryKeys = {
     user: () => [...queryKeys.settings.all, 'user'] as const,
     app: () => [...queryKeys.settings.all, 'app'] as const,
   },
+  
+  // Location queries
+  location: {
+    all: ['location'] as const,
+    current: () => [...queryKeys.location.all, 'current'] as const,
+    address: (coordinates: { lat: number; lng: number }) => [...queryKeys.location.all, 'address', coordinates] as const,
+    coordinates: (address: string) => [...queryKeys.location.all, 'coordinates', address] as const,
+  },
+  
+  // Places queries
+  places: {
+    all: ['places'] as const,
+    lists: () => [...queryKeys.places.all, 'list'] as const,
+    search: (params: any) => [...queryKeys.places.lists(), 'search', params] as const,
+    details: () => [...queryKeys.places.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.places.details(), id] as const,
+  },
 } as const
 
 /**

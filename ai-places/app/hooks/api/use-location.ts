@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import type { Coordinates, UserLocation, GeolocationOptions } from '@/types/places'
-import { MockGeolocationService } from '@/lib/mock/places-services'
-import { queryKeys } from '@/lib/tanstack-query/client'
+import { GoogleMapsGeolocationService } from '@/lib/services/google-maps'
 
 /**
  * Hook for managing user location and geolocation
@@ -22,8 +21,8 @@ export function useLocation() {
     error: locationError,
     refetch: refetchLocation,
   } = useQuery({
-    queryKey: queryKeys.location.current(),
-    queryFn: MockGeolocationService.getCurrentLocation,
+    queryKey: ['location', 'current'], // Fixed queryKey to use array directly
+    queryFn: GoogleMapsGeolocationService.getCurrentLocation,
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false,
     enabled: !manualLocation, // Don't auto-fetch if manual location is set
@@ -33,11 +32,11 @@ export function useLocation() {
    * Reverse geocoding mutation
    */
   const reverseGeocodeMutation = useMutation({
-    mutationFn: MockGeolocationService.getAddressFromCoordinates,
+    mutationFn: GoogleMapsGeolocationService.getAddressFromCoordinates,
     onSuccess: (address, coordinates) => {
       // Update cache with address information
       queryClient.setQueryData(
-        queryKeys.location.address(coordinates),
+        ['location', 'address', coordinates],
         address
       )
     },
@@ -47,11 +46,11 @@ export function useLocation() {
    * Forward geocoding mutation
    */
   const geocodeMutation = useMutation({
-    mutationFn: MockGeolocationService.getCoordinatesFromAddress,
+    mutationFn: GoogleMapsGeolocationService.getCoordinatesFromAddress,
     onSuccess: (coordinates, address) => {
       // Update cache with coordinates
       queryClient.setQueryData(
-        queryKeys.location.coordinates(address),
+        ['location', 'coordinates', address],
         coordinates
       )
     },
@@ -80,11 +79,10 @@ export function useLocation() {
     options?: GeolocationOptions
   ): Promise<UserLocation> => {
     try {
-      const location = await MockGeolocationService.getCurrentLocation()
-      
+      const location = await GoogleMapsGeolocationService.getCurrentLocation()
       // Invalidate and refetch current location query
-      queryClient.setQueryData(queryKeys.location.current(), location)
-      
+      queryClient.setQueryData(['location', 'current'], location)
+
       return location
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to get location')
@@ -96,15 +94,15 @@ export function useLocation() {
    */
   const setUserLocation = useCallback((coordinates: Coordinates) => {
     setManualLocation(coordinates)
-    
+
     // Create a user location object
     const userLocation: UserLocation = {
       current: coordinates,
       timestamp: Date.now(),
     }
-    
+
     // Update cache
-    queryClient.setQueryData(queryKeys.location.current(), userLocation)
+    queryClient.setQueryData(['location', 'current'], userLocation)
   }, [queryClient])
 
   /**
@@ -113,13 +111,13 @@ export function useLocation() {
   const getAddress = useCallback(async (coordinates: Coordinates): Promise<string> => {
     // Check cache first
     const cachedAddress = queryClient.getQueryData<string>(
-      queryKeys.location.address(coordinates)
+      ['location', 'address', coordinates]
     )
-    
+
     if (cachedAddress) {
       return cachedAddress
     }
-    
+
     // Fetch from API
     return reverseGeocodeMutation.mutateAsync(coordinates)
   }, [queryClient, reverseGeocodeMutation])
@@ -130,13 +128,13 @@ export function useLocation() {
   const getCoordinates = useCallback(async (address: string): Promise<Coordinates> => {
     // Check cache first
     const cachedCoordinates = queryClient.getQueryData<Coordinates>(
-      queryKeys.location.coordinates(address)
+      ['location', 'coordinates', address]
     )
-    
+
     if (cachedCoordinates) {
       return cachedCoordinates
     }
-    
+
     // Fetch from API
     const coordinates = await geocodeMutation.mutateAsync(address)
     setUserLocation(coordinates)
@@ -154,7 +152,7 @@ export function useLocation() {
   /**
    * Get effective location (manual or GPS)
    */
-  const effectiveLocation = manualLocation 
+  const effectiveLocation = manualLocation
     ? { current: manualLocation, timestamp: Date.now() }
     : currentLocation
 
@@ -171,15 +169,15 @@ export function useLocation() {
   /**
    * Get location loading state
    */
-  const isGettingLocation = isLoadingLocation || 
-    reverseGeocodeMutation.isPending || 
+  const isGettingLocation = isLoadingLocation ||
+    reverseGeocodeMutation.isPending ||
     geocodeMutation.isPending
 
   /**
    * Get location error
    */
-  const error = locationError || 
-    reverseGeocodeMutation.error || 
+  const error = locationError ||
+    reverseGeocodeMutation.error ||
     geocodeMutation.error
 
   // Effect to check permission on mount
@@ -193,19 +191,19 @@ export function useLocation() {
     hasLocation,
     isManualLocation,
     locationPermission,
-    
+
     // Loading states
     isLoadingLocation,
     isGettingLocation,
     isGeocodingAddress: geocodeMutation.isPending,
     isReverseGeocoding: reverseGeocodeMutation.isPending,
-    
+
     // Errors
     locationError,
     geocodingError: geocodeMutation.error,
     reverseGeocodingError: reverseGeocodeMutation.error,
     error,
-    
+
     // Actions
     requestCurrentLocation,
     setUserLocation,
@@ -214,7 +212,7 @@ export function useLocation() {
     getCoordinates,
     checkLocationPermission,
     refetchLocation,
-    
+
     // Utilities
     isLocationSupported: 'geolocation' in navigator,
   }
